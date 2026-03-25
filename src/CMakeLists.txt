@@ -48,8 +48,11 @@ set(MODULE_CLIENT_SOURCES
     logos_sdk_c.h
 )
 
-# Create the library as static
-add_library(logos_module_client STATIC ${MODULE_CLIENT_SOURCES})
+# Create the library as shared (needed for FFI consumers like logos-js-sdk)
+add_library(logos_module_client SHARED ${MODULE_CLIENT_SOURCES})
+set_target_properties(logos_module_client PROPERTIES
+    POSITION_INDEPENDENT_CODE ON
+)
 
 # Link Qt libraries and SDK
 target_link_libraries(logos_module_client PUBLIC

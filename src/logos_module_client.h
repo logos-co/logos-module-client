@@ -18,6 +18,13 @@ typedef struct {
 // Initialize the module client with host callbacks for state queries
 void logos_module_client_init(LogosModuleClientHost host);
 
+// FFI-friendly init: takes individual function pointers instead of a struct
+void logos_module_client_init_with_callbacks(
+    int (*is_plugin_loaded)(const char* plugin_name),
+    int (*is_plugin_known)(const char* plugin_name),
+    int (*load_plugin)(const char* plugin_name)
+);
+
 // Simple async operation example that uses a callback
 void logos_module_client_async_operation(const char* data, LogosClientCallback callback, void* user_data);
 
