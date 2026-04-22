@@ -59,6 +59,38 @@ void LogosCoreClient::callMethodAsync(const QString& pluginName,
         });
 }
 
+QString LogosCoreClient::callMethodSync(const QString& pluginName,
+                                         const QString& methodName,
+                                         const QString& paramsJson)
+{
+    bool ok = false;
+    QString errorMessage;
+    QVariantList args = LogosJsonUtils::parseMethodParams(paramsJson, &ok, &errorMessage);
+
+    if (!ok) {
+        qWarning() << "LogosCoreClient::callMethodSync: failed to parse params:" << errorMessage;
+        return QString();
+    }
+
+    LogosAPIClient* client = m_api->getClient(pluginName);
+    if (!client) {
+        qWarning() << "LogosCoreClient::callMethodSync: failed to get client for:" << pluginName;
+        return QString();
+    }
+
+    QVariant result = client->invokeRemoteMethod(pluginName, methodName, args);
+
+    if (!result.isValid()) {
+        return QString();
+    }
+
+    if (result.canConvert<QString>()) {
+        return result.toString();
+    }
+
+    return QString("Result of type: %1").arg(result.typeName());
+}
+
 void LogosCoreClient::subscribeEvent(const QString& pluginName,
                                       const QString& eventName,
                                       AsyncCallback callback)

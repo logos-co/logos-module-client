@@ -43,6 +43,17 @@ public:
                          AsyncCallback callback);
 
     /**
+     * Call a plugin method synchronously, with parameters provided as a JSON
+     * string in the [{name,value,type},...] format used by FFI consumers.
+     * Returns the result as a string, or an empty string on failure.
+     * Must be called from within a context where Qt event processing works
+     * (i.e. from inside a loaded Logos module, which already has a Qt event loop).
+     */
+    QString callMethodSync(const QString& pluginName,
+                           const QString& methodName,
+                           const QString& paramsJson);
+
+    /**
      * Subscribe to an event from a plugin. The callback fires each time
      * the event is emitted, with a JSON-formatted message.
      */

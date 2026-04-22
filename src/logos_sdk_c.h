@@ -12,6 +12,28 @@ extern "C" {
 typedef void (*LogosSdkCallback)(int result, const char* message, void* user_data);
 
 /**
+ * Call a plugin method synchronously.
+ *
+ * @param plugin_name  Target plugin name
+ * @param method_name  Method to call
+ * @param params_json  JSON array of [{name,value,type},...] parameters (may be NULL for "[]")
+ * @return             Heap-allocated result string (must be freed with logos_sdk_free_string),
+ *                     or NULL on failure. Must be called from within a Logos module process
+ *                     that already has a running Qt event loop.
+ */
+char* logos_sdk_call_method_sync(
+    const char* plugin_name,
+    const char* method_name,
+    const char* params_json
+);
+
+/**
+ * Free a string returned by logos_sdk_call_method_sync.
+ * Safe to call with NULL.
+ */
+void logos_sdk_free_string(char* str);
+
+/**
  * Call a plugin method asynchronously.
  *
  * @param plugin_name  Target plugin name
