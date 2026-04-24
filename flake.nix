@@ -70,6 +70,13 @@
             pkgs.qt6.qtbase
             pkgs.qt6.qtremoteobjects
             pkgs.gtest
+            # Pulled in transitively by logos-cpp-sdk's plain-C++
+            # TCP+SSL transport. Listing them here keeps `nix develop`
+            # in sync with the build (find_package(OpenSSL/Boost) at
+            # configure time would otherwise fail outside `nix build`).
+            pkgs.openssl
+            pkgs.boost
+            pkgs.nlohmann_json
           ];
         };
       });
