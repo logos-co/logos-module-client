@@ -18,6 +18,9 @@
     pkgs.qt6.qtbase
     pkgs.qt6.qtremoteobjects
     pkgs.gtest
+    pkgs.openssl              # Transitive via SDK's plain-C++ TLS transport
+    pkgs.boost
+    pkgs.nlohmann_json
   ];
 
   # Common CMake flags

@@ -21,10 +21,16 @@ if(EXISTS "${LOGOS_CPP_SDK_ROOT}/lib" AND EXISTS "${LOGOS_CPP_SDK_ROOT}/include"
     message(FATAL_ERROR "logos_sdk library not found in ${LOGOS_CPP_SDK_ROOT}/lib")
   endif()
 
+  # The SDK's plain-C++ TCP+SSL transport pulls in OpenSSL via Boost.Asio's
+  # SSL wrappers, so downstream executables linking the static SDK need to
+  # link OpenSSL too.
+  find_package(OpenSSL REQUIRED)
+
   add_library(logos_sdk STATIC IMPORTED)
   set_target_properties(logos_sdk PROPERTIES
     IMPORTED_LOCATION "${LOGOS_SDK_LIBRARY}"
     INTERFACE_INCLUDE_DIRECTORIES "${LOGOS_CPP_SDK_ROOT}/include"
+    INTERFACE_LINK_LIBRARIES "OpenSSL::SSL;OpenSSL::Crypto"
   )
 
 elseif(EXISTS "${LOGOS_CPP_SDK_ROOT}/cpp/CMakeLists.txt")
