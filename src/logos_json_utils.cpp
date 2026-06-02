@@ -2,6 +2,7 @@
 #include <QJsonDocument>
 #include <QJsonArray>
 #include <QJsonObject>
+#include <QByteArray>
 #include <QDebug>
 
 namespace LogosJsonUtils {
@@ -31,6 +32,11 @@ QVariant jsonParamToVariant(const QJsonObject& param)
         bool ok;
         double doubleValue = value.toDouble(&ok);
         return ok ? QVariant(doubleValue) : QVariant();
+    } else if (type == "bytes" || type == "base64") {
+        // Binary payloads cross the IPC param channel as base64 text; decode
+        // to a QByteArray so methods taking QByteArray / std::vector<uint8_t>
+        // receive the original bytes (not the UTF-8 of the base64 string).
+        return QVariant(QByteArray::fromBase64(value.toUtf8()));
     } else {
         qWarning() << "LogosJsonUtils: Unknown parameter type:" << type << "- treating as string";
         return QVariant(value);
