@@ -5,21 +5,34 @@
     logos-nix.url = "github:logos-co/logos-nix";
     nixpkgs.follows = "logos-nix/nixpkgs";
     logos-cpp-sdk.url = "github:logos-co/logos-cpp-sdk";
+    logos-cpp-sdk.inputs.logos-protocol.follows = "logos-protocol";
+    logos-protocol = {
+      url = "github:logos-co/logos-protocol";
+      inputs.logos-nix.follows = "logos-nix";
+    };
+    logos-qt-sdk = {
+      url = "github:logos-co/logos-qt-sdk";
+      inputs.logos-nix.follows = "logos-nix";
+      inputs.logos-protocol.follows = "logos-protocol";
+      inputs.logos-cpp-sdk.follows = "logos-cpp-sdk";
+    };
   };
 
-  outputs = { self, nixpkgs, logos-nix, logos-cpp-sdk }:
+  outputs = { self, nixpkgs, logos-nix, logos-cpp-sdk, logos-protocol, logos-qt-sdk }:
     let
       systems = [ "aarch64-darwin" "x86_64-darwin" "aarch64-linux" "x86_64-linux" ];
       forAllSystems = f: nixpkgs.lib.genAttrs systems (system: f {
         inherit system;
         pkgs = import nixpkgs { inherit system; };
         logosSdk = logos-cpp-sdk.packages.${system}.default;
+        logosProtocolPkg = logos-protocol.packages.${system}.default;
+        logosQtSdk = logos-qt-sdk.packages.${system}.default;
       });
     in
     {
-      packages = forAllSystems ({ pkgs, system, logosSdk }:
+      packages = forAllSystems ({ pkgs, system, logosSdk, logosProtocolPkg, logosQtSdk }:
         let
-          common = import ./nix/default.nix { inherit pkgs logosSdk; };
+          common = import ./nix/default.nix { inherit pkgs logosSdk logosProtocolPkg logosQtSdk; };
           src = ./.;
 
           build = import ./nix/build.nix { inherit pkgs common src; };

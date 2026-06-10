@@ -19,6 +19,22 @@ target_include_directories(module_client_tests PRIVATE
     ${CMAKE_SOURCE_DIR}/src
 )
 
+# Mock-transport headers now ship from logos-protocol; the Qt developer
+# headers from logos-qt-sdk.
+if(DEFINED LOGOS_PROTOCOL_ROOT AND EXISTS "${LOGOS_PROTOCOL_ROOT}/include")
+  target_include_directories(module_client_tests PRIVATE
+    ${LOGOS_PROTOCOL_ROOT}/include
+    ${LOGOS_PROTOCOL_ROOT}/include/cpp
+    ${LOGOS_PROTOCOL_ROOT}/include/cpp/implementations/mock
+  )
+endif()
+if(DEFINED LOGOS_QT_SDK_ROOT AND EXISTS "${LOGOS_QT_SDK_ROOT}/include")
+  target_include_directories(module_client_tests PRIVATE
+    ${LOGOS_QT_SDK_ROOT}/include
+    ${LOGOS_QT_SDK_ROOT}/include/cpp
+  )
+endif()
+
 # Add SDK mock include directory for test_logos_core_client and test_logos_sdk_c
 if(EXISTS "${LOGOS_CPP_SDK_ROOT}/lib" AND EXISTS "${LOGOS_CPP_SDK_ROOT}/include")
   target_include_directories(module_client_tests PRIVATE

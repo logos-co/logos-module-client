@@ -23,6 +23,8 @@ pkgs.stdenv.mkDerivation {
     cmake -B build -S ${build.src} \
       -GNinja \
       -DLOGOS_CPP_SDK_ROOT=${common.env.LOGOS_CPP_SDK_ROOT} \
+      -DLOGOS_PROTOCOL_ROOT=${common.env.LOGOS_PROTOCOL_ROOT} \
+      -DLOGOS_QT_SDK_ROOT=${common.env.LOGOS_QT_SDK_ROOT} \
       -DCMAKE_BUILD_TYPE=Release \
       -DCMAKE_INSTALL_PREFIX=$out
 
