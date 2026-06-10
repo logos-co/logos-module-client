@@ -61,7 +61,8 @@ void LogosCoreClient::callMethodAsync(const QString& pluginName,
 
 QString LogosCoreClient::callMethodSync(const QString& pluginName,
                                          const QString& methodName,
-                                         const QString& paramsJson)
+                                         const QString& paramsJson,
+                                         Timeout timeout)
 {
     bool ok = false;
     QString errorMessage;
@@ -78,7 +79,7 @@ QString LogosCoreClient::callMethodSync(const QString& pluginName,
         return QString();
     }
 
-    QVariant result = client->invokeRemoteMethod(pluginName, methodName, args);
+    QVariant result = client->invokeRemoteMethod(pluginName, methodName, args, timeout);
 
     if (!result.isValid()) {
         return QString();

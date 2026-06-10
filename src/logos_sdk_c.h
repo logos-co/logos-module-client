@@ -17,6 +17,7 @@ typedef void (*LogosSdkCallback)(int result, const char* message, void* user_dat
  * @param plugin_name  Target plugin name
  * @param method_name  Method to call
  * @param params_json  JSON array of [{name,value,type},...] parameters (may be NULL for "[]")
+ * @param timeout_ms   Reply timeout in milliseconds; <= 0 uses the default
  * @return             Heap-allocated result string (must be freed with logos_sdk_free_string),
  *                     or NULL on failure. Must be called from within a Logos module process
  *                     that already has a running Qt event loop.
@@ -24,7 +25,8 @@ typedef void (*LogosSdkCallback)(int result, const char* message, void* user_dat
 char* logos_sdk_call_method_sync(
     const char* plugin_name,
     const char* method_name,
-    const char* params_json
+    const char* params_json,
+    int timeout_ms
 );
 
 /**

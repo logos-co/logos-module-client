@@ -1,5 +1,6 @@
 #include "logos_sdk_c.h"
 #include "logos_core_client.h"
+#include "logos_mode.h"
 #include <QString>
 #include <QByteArray>
 #include <cstdlib>
@@ -17,7 +18,8 @@ static LogosCoreClient* ensureClient()
 char* logos_sdk_call_method_sync(
     const char* plugin_name,
     const char* method_name,
-    const char* params_json)
+    const char* params_json,
+    int timeout_ms)
 {
     if (!plugin_name || !method_name) return nullptr;
 
@@ -25,7 +27,8 @@ char* logos_sdk_call_method_sync(
     QString methodStr = QString::fromUtf8(method_name);
     QString paramsStr = params_json ? QString::fromUtf8(params_json) : QStringLiteral("[]");
 
-    QString result = ensureClient()->callMethodSync(pluginStr, methodStr, paramsStr);
+    QString result = ensureClient()->callMethodSync(pluginStr, methodStr, paramsStr,
+        timeout_ms > 0 ? Timeout(timeout_ms) : Timeout());
     if (result.isNull()) return nullptr;
 
     QByteArray bytes = result.toUtf8();

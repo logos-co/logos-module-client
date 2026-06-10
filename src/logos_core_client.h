@@ -7,6 +7,7 @@
 #include <QVariantList>
 #include <QHash>
 #include <functional>
+#include "logos_mode.h"
 
 class LogosAPI;
 class LogosAPIClient;
@@ -51,7 +52,8 @@ public:
      */
     QString callMethodSync(const QString& pluginName,
                            const QString& methodName,
-                           const QString& paramsJson);
+                           const QString& paramsJson,
+                           Timeout timeout = Timeout());
 
     /**
      * Subscribe to an event from a plugin. The callback fires each time
