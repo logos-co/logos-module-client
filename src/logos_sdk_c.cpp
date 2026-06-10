@@ -45,14 +45,25 @@ lp_client* clientFor(const char* plugin_name)
 // [{"name":...,"value":...,"type":...}, ...]; lp_invoke takes a plain JSON
 // array of values. Values may arrive natively typed or as strings with a
 // coercion hint in "type".
-std::string ffiParamsToJsonArray(const char* params_json)
+//
+// Validation mirrors the historical LogosJsonUtils::parseMethodParams
+// semantics: malformed JSON and uncoercible typed values fail FAST through
+// the callback ("JSON parse error: ..." / "Invalid parameter: <name>")
+// instead of going out over the transport.
+bool ffiParamsToJsonArray(const char* params_json, std::string* outArray,
+                          std::string* error)
 {
     nlohmann::json out = nlohmann::json::array();
-    if (!params_json || !*params_json) return out.dump();
+    if (!params_json || !*params_json) { *outArray = out.dump(); return true; }
 
-    nlohmann::json parsed = nlohmann::json::parse(params_json, nullptr,
-                                                  /*allow_exceptions=*/false);
-    if (parsed.is_discarded() || !parsed.is_array()) return out.dump();
+    nlohmann::json parsed;
+    try {
+        parsed = nlohmann::json::parse(params_json);
+    } catch (const nlohmann::json::parse_error& e) {
+        *error = std::string("JSON parse error: ") + e.what();
+        return false;
+    }
+    if (!parsed.is_array()) { *outArray = out.dump(); return true; }
 
     for (const auto& entry : parsed) {
         if (!entry.is_object() || !entry.contains("value")) {
@@ -63,19 +74,41 @@ std::string ffiParamsToJsonArray(const char* params_json)
         const std::string type =
             entry.contains("type") && entry["type"].is_string()
                 ? entry["type"].get<std::string>() : "";
+        const std::string name =
+            entry.contains("name") && entry["name"].is_string()
+                ? entry["name"].get<std::string>() : "";
         if (value.is_string() && (type == "int" || type == "uint")) {
-            try { out.push_back(std::stoll(value.get<std::string>())); continue; }
-            catch (...) {}
-        } else if (value.is_string() && type == "double") {
-            try { out.push_back(std::stod(value.get<std::string>())); continue; }
-            catch (...) {}
+            try {
+                size_t used = 0;
+                const std::string& s = value.get_ref<const std::string&>();
+                const long long n = std::stoll(s, &used);
+                if (used != s.size()) throw std::invalid_argument(s);
+                out.push_back(n);
+                continue;
+            } catch (...) {
+                *error = "Invalid parameter: " + name;
+                return false;
+            }
+        } else if (value.is_string() && (type == "double" || type == "float")) {
+            try {
+                size_t used = 0;
+                const std::string& s = value.get_ref<const std::string&>();
+                const double d = std::stod(s, &used);
+                if (used != s.size()) throw std::invalid_argument(s);
+                out.push_back(d);
+                continue;
+            } catch (...) {
+                *error = "Invalid parameter: " + name;
+                return false;
+            }
         } else if (value.is_string() && type == "bool") {
             out.push_back(value.get<std::string>() == "true");
             continue;
         }
         out.push_back(value);
     }
-    return out.dump();
+    *outArray = out.dump();
+    return true;
 }
 
 // Historical message semantics: the callback message is the result as a
@@ -124,8 +157,14 @@ void logos_sdk_call_method_async(
         return;
     }
 
+    std::string args;
+    std::string paramError;
+    if (!ffiParamsToJsonArray(params_json, &args, &paramError)) {
+        callback(0, paramError.c_str(), user_data);
+        return;
+    }
+
     auto* call = new AsyncCall{callback, user_data};
-    const std::string args = ffiParamsToJsonArray(params_json);
     const int rc = lp_invoke_async(
         client, method_name, args.c_str(), 0,
         [](int ok, const char* json, void* opaque) {
