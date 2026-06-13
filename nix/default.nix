@@ -1,5 +1,5 @@
 # Common build configuration shared across all packages
-{ pkgs, logosSdk }:
+{ pkgs, logosSdk, logosProtocolPkg, logosQtSdk }:
 
 {
   pname = "logos-module-client";
@@ -27,6 +27,8 @@
     pkgs.qt6.qtbase
     pkgs.qt6.qtremoteobjects
     logosSdk
+    logosProtocolPkg
+    logosQtSdk
     pkgs.gtest
   ];
 
@@ -34,11 +36,15 @@
   cmakeFlags = [
     "-GNinja"
     "-DLOGOS_CPP_SDK_ROOT=${logosSdk}"
+    "-DLOGOS_PROTOCOL_ROOT=${logosProtocolPkg}"
+    "-DLOGOS_QT_SDK_ROOT=${logosQtSdk}"
   ];
 
   # Environment variables
   env = {
     LOGOS_CPP_SDK_ROOT = "${logosSdk}";
+    LOGOS_PROTOCOL_ROOT = "${logosProtocolPkg}";
+    LOGOS_QT_SDK_ROOT = "${logosQtSdk}";
   };
 
   # Metadata

@@ -7,37 +7,32 @@ endif()
 
 get_filename_component(LOGOS_CPP_SDK_ROOT "${LOGOS_CPP_SDK_ROOT}" ABSOLUTE)
 
-# Check if we have a built SDK package (with lib and include directories)
-if(EXISTS "${LOGOS_CPP_SDK_ROOT}/lib" AND EXISTS "${LOGOS_CPP_SDK_ROOT}/include")
-  message(STATUS "Using built logos-cpp-sdk at ${LOGOS_CPP_SDK_ROOT}")
+# The SDK stack since the Qt split: this client layers on the Qt
+# developer layer (logos-qt-sdk: LogosAPI/LogosAPIClient), which chains
+# logos-protocol (transports + lp_* C ABI) with its full transitive link
+# interface — replacing the old hand-rolled IMPORTED archive.
+if(NOT DEFINED LOGOS_PROTOCOL_ROOT AND DEFINED ENV{LOGOS_PROTOCOL_ROOT})
+  set(LOGOS_PROTOCOL_ROOT "$ENV{LOGOS_PROTOCOL_ROOT}")
+endif()
+if(NOT DEFINED LOGOS_QT_SDK_ROOT AND DEFINED ENV{LOGOS_QT_SDK_ROOT})
+  set(LOGOS_QT_SDK_ROOT "$ENV{LOGOS_QT_SDK_ROOT}")
+endif()
 
-  find_library(LOGOS_SDK_LIBRARY
-    NAMES logos_sdk
-    PATHS "${LOGOS_CPP_SDK_ROOT}/lib"
-    NO_DEFAULT_PATH
-  )
-
-  if(NOT LOGOS_SDK_LIBRARY)
-    message(FATAL_ERROR "logos_sdk library not found in ${LOGOS_CPP_SDK_ROOT}/lib")
+if(EXISTS "${LOGOS_PROTOCOL_ROOT}/lib/cmake/logos-protocol"
+   AND EXISTS "${LOGOS_QT_SDK_ROOT}/lib/cmake/logos-qt-sdk")
+  message(STATUS "Using logos-protocol at ${LOGOS_PROTOCOL_ROOT}")
+  message(STATUS "Using logos-qt-sdk at ${LOGOS_QT_SDK_ROOT}")
+  find_package(logos-protocol REQUIRED
+    PATHS "${LOGOS_PROTOCOL_ROOT}/lib/cmake/logos-protocol" NO_DEFAULT_PATH)
+  find_package(logos-qt-sdk REQUIRED
+    PATHS "${LOGOS_QT_SDK_ROOT}/lib/cmake/logos-qt-sdk" NO_DEFAULT_PATH)
+  if(NOT TARGET logos_sdk)
+    add_library(logos_sdk INTERFACE IMPORTED)
+    target_link_libraries(logos_sdk INTERFACE logos-qt-sdk::logos_qt_sdk)
   endif()
-
-  # The SDK's plain-C++ TCP+SSL transport pulls in OpenSSL via Boost.Asio's
-  # SSL wrappers, so downstream executables linking the static SDK need to
-  # link OpenSSL too.
-  find_package(OpenSSL REQUIRED)
-
-  add_library(logos_sdk STATIC IMPORTED)
-  set_target_properties(logos_sdk PROPERTIES
-    IMPORTED_LOCATION "${LOGOS_SDK_LIBRARY}"
-    INTERFACE_INCLUDE_DIRECTORIES "${LOGOS_CPP_SDK_ROOT}/include"
-    INTERFACE_LINK_LIBRARIES "OpenSSL::SSL;OpenSSL::Crypto"
-  )
-
-elseif(EXISTS "${LOGOS_CPP_SDK_ROOT}/cpp/CMakeLists.txt")
-  message(STATUS "Using logos-cpp-sdk source at ${LOGOS_CPP_SDK_ROOT}")
-  add_subdirectory(${LOGOS_CPP_SDK_ROOT}/cpp ${CMAKE_BINARY_DIR}/sdk)
 else()
-  message(FATAL_ERROR "logos-cpp-sdk not found at ${LOGOS_CPP_SDK_ROOT}")
+  message(FATAL_ERROR "logos-protocol / logos-qt-sdk not found. Set "
+                      "LOGOS_PROTOCOL_ROOT and LOGOS_QT_SDK_ROOT to built packages.")
 endif()
 
 # Library sources
