@@ -1,0 +1,147 @@
+name: "Validating logos-module-client as a Library"
+output: module-client-library.md
+release: ""
+
+intro: |
+  [`logos-module-client`](https://github.com/logos-co/logos-module-client) is the
+  **proxy API and SDK client library** that callers use to invoke Logos module methods
+  asynchronously. It provides a C API (`logos_module_client.h`), the high-level
+  `LogosCoreClient` C++ interface with cached connections, `LogosJsonUtils` for FFI
+  parameter (de)serialization, and the low-level `logos_sdk_c` FFI bridge to the SDK.
+
+  Because it is a *library*, the way to prove **this** commit works is to build the
+  library + headers it publishes and to build and run its own GoogleTest suite — which
+  exercises every part of the public surface against the SDK's in-process mock:
+
+  1. Build the test binary (`#logos-module-client-tests`) from the commit under test.
+  2. Build the library + headers package and list what it ships.
+  3. List the GoogleTest suites baked into the binary.
+  4. Run individual suites (`LogosJsonUtilsTest`, `LogosCoreClientTest`) and then the
+     full suite, all under the headless `offscreen` Qt platform.
+
+  Every artifact is built from the commit under test, so a green run is direct evidence
+  that this change keeps the client library building and its async API behaving.
+
+what_you_build: "This commit of `logos-module-client` built as a library + headers package, plus its GoogleTest binary run end-to-end under a headless Qt platform."
+
+what_you_learn:
+  - How `logos-module-client` exposes its library, headers, and test binary as flake outputs
+  - What public headers the library ships (`logos_module_client.h`, `LogosCoreClient`, …)
+  - How to list and run individual GoogleTest suites with `--gtest_list_tests` / `--gtest_filter`
+  - Why a Qt-based test binary runs headless with `QT_QPA_PLATFORM=offscreen`
+
+prerequisites:
+  - |
+    **Nix** with flakes enabled. Install from [nixos.org](https://nixos.org/download.html), then enable flakes:
+
+    ```bash
+    mkdir -p ~/.config/nix
+    echo 'experimental-features = nix-command flakes' >> ~/.config/nix/nix.conf
+    ```
+
+    Verify: `nix flake --help >/dev/null 2>&1 && echo "Flakes enabled"`
+  - "A Linux or macOS machine. The test binary builds on `QCoreApplication` and runs headless via `QT_QPA_PLATFORM=offscreen` — no display required."
+
+sections:
+  - title: "Build the test binary"
+    step: true
+    text: |
+      The flake exposes the GoogleTest suite as `#logos-module-client-tests`. Build it
+      from the commit under test and link it as `./mc-tests`; the executable lands at
+      `./mc-tests/bin/module_client_tests`.
+
+      > The `{release}` in the URL pins the build to the commit under test: the doc-test
+      > runner expands it to a concrete ref (locally this checkout's `HEAD` — see
+      > `run.sh`; in CI the commit being tested). With no pin it falls back to the latest
+      > `master`. Developing against a local checkout? Replace the GitHub reference with
+      > `.`, e.g. `nix build '.#logos-module-client-tests' -o mc-tests`.
+    steps:
+      - title: "Build #logos-module-client-tests"
+        run: "nix build 'github:logos-co/logos-module-client{release}#logos-module-client-tests' -o mc-tests"
+        code_block: |
+          nix build 'github:logos-co/logos-module-client{release}#logos-module-client-tests' -o mc-tests
+        check_file: "mc-tests/bin/module_client_tests"
+        post_text: "The result symlink `./mc-tests` holds the GoogleTest binary at `bin/module_client_tests`."
+
+  - title: "Build the library + headers"
+    step: true
+    text: |
+      The default package is the consumable library: the compiled `LogosCoreClient` /
+      C-API library joined with its public headers. Build it and list the headers a
+      downstream consumer would `#include`.
+    steps:
+      - title: "Build the default (library + headers) package"
+        run: "nix build 'github:logos-co/logos-module-client{release}' -o mc"
+        code_block: |
+          nix build 'github:logos-co/logos-module-client{release}' -o mc
+        check_file: "mc"
+
+      - title: "List the public headers"
+        run: "ls mc/include"
+        expect_contains:
+          - "logos_module_client.h"
+        post_text: |
+          These are the headers an FFI or C++ consumer links against — the C API
+          (`logos_module_client.h`) plus the `LogosCoreClient` / `LogosJsonUtils` surface.
+
+  - title: "Explore the test suites"
+    step: true
+    text: |
+      The binary is built on `QCoreApplication`, so it runs without a display once the
+      Qt platform is set to `offscreen`. List the GoogleTest suites it contains.
+    steps:
+      - title: "List all tests"
+        run: "QT_QPA_PLATFORM=offscreen ./mc-tests/bin/module_client_tests --gtest_list_tests"
+        code_block: "QT_QPA_PLATFORM=offscreen ./mc-tests/bin/module_client_tests --gtest_list_tests"
+        expect_contains:
+          - "LogosJsonUtilsTest"
+          - "LogosCoreClientTest"
+          - "ProxyAPITest"
+          - "LogosSdkCTest"
+
+  - title: "Run individual suites"
+    step: true
+    text: |
+      `--gtest_filter` runs a subset. Start with `LogosJsonUtilsTest` (the FFI JSON
+      parameter conversions) and `LogosCoreClientTest` (the high-level async API over the
+      SDK's in-process mock).
+    steps:
+      - title: "Run the JSON utils suite"
+        run: "QT_QPA_PLATFORM=offscreen ./mc-tests/bin/module_client_tests --gtest_filter='LogosJsonUtilsTest.*'"
+        code_block: "QT_QPA_PLATFORM=offscreen ./mc-tests/bin/module_client_tests --gtest_filter='LogosJsonUtilsTest.*'"
+        expect_contains:
+          - "LogosJsonUtilsTest"
+          - "PASSED"
+
+      - title: "Run the LogosCoreClient suite"
+        run: "QT_QPA_PLATFORM=offscreen ./mc-tests/bin/module_client_tests --gtest_filter='LogosCoreClientTest.*'"
+        code_block: "QT_QPA_PLATFORM=offscreen ./mc-tests/bin/module_client_tests --gtest_filter='LogosCoreClientTest.*'"
+        expect_contains:
+          - "LogosCoreClientTest"
+          - "PASSED"
+
+  - title: "Run the full suite"
+    step: true
+    text: |
+      Finally, run every suite. A clean `[  PASSED  ]` with zero failures is the
+      end-to-end proof that this commit's client library behaves across its whole
+      surface — JSON utils, the proxy API, the C FFI bridge, and the high-level client.
+    steps:
+      - title: "Run all tests"
+        run: "QT_QPA_PLATFORM=offscreen ./mc-tests/bin/module_client_tests"
+        code_block: "QT_QPA_PLATFORM=offscreen ./mc-tests/bin/module_client_tests"
+        expect_contains:
+          - "[  PASSED  ]"
+
+  - title: "Recap"
+    text: |
+      You validated this commit of `logos-module-client` as a consumable library:
+
+      | Artifact | Built from | Proves |
+      |---|---|---|
+      | `#logos-module-client-tests` | `packages.logos-module-client-tests` | the GoogleTest suite compiles and links |
+      | default package | `packages.default` (lib + headers) | the library + public headers are shippable |
+      | full `gtest` run | the binary above | the async client API behaves across its whole surface |
+
+      Because all of it is built from the commit under test, a green run is evidence the
+      client library still builds and its async method-call API still works.
