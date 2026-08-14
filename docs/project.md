@@ -21,7 +21,8 @@ logos-module-client  (this repo — Proxy API + SDK client surface)
         |
         |  C++ path                       C ABI / FFI path
         v                                 v
-logos-qt-sdk (LogosAPI/LogosAPIClient)    logos-protocol (lp_* C ABI)
+logos-qt-host (LogosAPI)                  logos-protocol (lp_* C ABI;
+  — from logos-plugin-qt                    LogosAPIClient / LogosObject)
         \                                /
          \                              /
           v                            v
@@ -30,8 +31,9 @@ logos-qt-sdk (LogosAPI/LogosAPIClient)    logos-protocol (lp_* C ABI)
 
 It deliberately offers **two layers** so both C++ and non-C++ consumers can use it:
 
-- a high-level C++ class, `LogosCoreClient`, built on the Qt developer layer
-  (`LogosAPI` / `LogosAPIClient` from `logos-qt-sdk`) with cached, persistent
+- a high-level C++ class, `LogosCoreClient`, built on the Qt host runtime
+  (`LogosAPI` from `logos-plugin-qt`'s `logos-qt-host`; `LogosAPIClient` /
+  `LogosObject` come from `logos-protocol` underneath) with cached, persistent
   per-plugin connections; and
 - a flat `extern "C"` ABI (`logos_module_client.h`, `logos_sdk_c.h`) that
   FFI consumers such as `logos-js-sdk` and `logos-rust-sdk` link the same symbols
@@ -52,7 +54,7 @@ output, and a GoogleTest binary, and is consumed by higher-level SDK bindings.
 
 | Direction | Repos |
 |-----------|-------|
-| Depends on | `logos-cpp-sdk`, `logos-protocol`, `logos-qt-sdk`, `logos-nix` |
+| Depends on | `logos-cpp-sdk`, `logos-protocol`, `logos-plugin-qt`, `logos-nix` |
 | Consumed by | `logos-logoscore-cli`, `logos-js-sdk`, `logos-rust-sdk` |
 
 ## Project Structure
@@ -69,8 +71,8 @@ logos-module-client/
 ├── .gitignore
 ├── src/
 │   ├── CMakeLists.txt            # Builds the SHARED logos_module_client target;
-│   │                             # resolves logos-protocol/logos-qt-sdk via
-│   │                             # LOGOS_PROTOCOL_ROOT / LOGOS_QT_SDK_ROOT; AUTOMOC on
+│   │                             # resolves logos-protocol/logos-qt-host via
+│   │                             # LOGOS_PROTOCOL_ROOT / LOGOS_QT_HOST_ROOT; AUTOMOC on
 │   ├── logos_module_client.h     # Public C ABI: callback/host typedefs +
 │   │                             # logos_module_client_* declarations (installed)
 │   ├── logos_module_client.cpp   # Thin C-API wrappers forwarding to ProxyAPI / logos_sdk_*
@@ -85,7 +87,7 @@ logos-module-client/
 │   │                             # {name,value,type} -> JSON coercion (nlohmann_json),
 │   │                             # result-to-message conversion, lp_invoke_async / lp_subscribe
 │   ├── logos_core_client.h       # LogosCoreClient QObject (high-level C++ async interface)
-│   ├── logos_core_client.cpp     # LogosCoreClient impl over the Qt developer layer
+│   ├── logos_core_client.cpp     # LogosCoreClient impl over the Qt host runtime
 │   │                             # (LogosAPI / LogosAPIClient / LogosObject)
 │   ├── logos_json_utils.h        # LogosJsonUtils namespace (Qt-side JSON marshaling)
 │   └── logos_json_utils.cpp      # Type coercion, QVariant<->JSON string, event JSON
@@ -130,14 +132,14 @@ logos-module-client/
 | Dependency | Type | Purpose |
 |------------|------|---------|
 | **[logos-cpp-sdk](https://github.com/logos-co/logos-cpp-sdk)** | Flake input | Core SDK; pins nixpkgs/Qt; transitively supplies Boost/OpenSSL/nlohmann_json via `propagatedBuildInputs`. CMake root `LOGOS_CPP_SDK_ROOT` |
-| **[logos-qt-sdk](https://github.com/logos-co/logos-qt-sdk)** | Flake input | Qt developer layer: `LogosAPI` / `LogosAPIClient` / `LogosObject` used by `LogosCoreClient`. CMake target `logos-qt-sdk::logos_qt_sdk`; resolved via `LOGOS_QT_SDK_ROOT` |
+| **[logos-plugin-qt](https://github.com/logos-co/logos-plugin-qt)** | Flake input | Qt **host runtime** (`packages.<sys>.logos-qt-host`): `LogosAPI`, used by `LogosCoreClient`. CMake target `logos-qt-host::logos_qt_host`; resolved via `LOGOS_QT_HOST_ROOT`. This runtime used to ship from `logos-qt-sdk` as `logos-qt-sdk::logos_qt_sdk`; it was the only thing this repo took from there, so that input is gone. `LogosAPIClient` / `LogosObject` are `logos-protocol` types, not host-runtime ones |
 | **[logos-protocol](https://github.com/logos-co/logos-protocol)** | Flake input | Language-neutral `lp_*` C ABI + transports (`logos_protocol.h`) that `logos_sdk_c.cpp` facades over; also provides the mock-transport headers (`logos_mock.h`, `LogosMockSetup`) for tests. Resolved via `LOGOS_PROTOCOL_ROOT` |
 | **[logos-nix](https://github.com/logos-co/logos-nix)** | Flake input | Nix helper flake; provides the nixpkgs pin (`nixpkgs.follows = "logos-nix/nixpkgs"`) |
 | **Qt6 qtbase + qtremoteobjects** | nixpkgs | Linked PUBLIC. Listed explicitly because the SDK does **not** propagate Qt (qtbase's `qtPreHook` setup-hook ordering can't be guaranteed through propagation) |
 | **OpenSSL + Boost** | nixpkgs (transitive) | Pulled in by the SDK's plain-C++ TCP+SSL transport; listed in the devShell and on the Linux test-binary rpath |
 
 The flake wires `follows` so a single nixpkgs/SDK pin flows through every input
-(`logos-cpp-sdk.inputs.logos-protocol.follows`, `logos-qt-sdk.inputs.{logos-protocol,logos-cpp-sdk}.follows`).
+(`logos-cpp-sdk.inputs.logos-protocol.follows`, `logos-plugin-qt.inputs.{logos-nix,logos-protocol}.follows`).
 
 ## Components
 
@@ -356,7 +358,7 @@ nix develop      # cmake, ninja, pkg-config, Qt6 (Core/RemoteObjects),
 ```
 
 > The CMake config hard-errors (`FATAL_ERROR`) if `LOGOS_PROTOCOL_ROOT` /
-> `LOGOS_QT_SDK_ROOT` do not point at built packages, so a raw `cmake ..` outside the
+> `LOGOS_QT_HOST_ROOT` do not point at built packages, so a raw `cmake ..` outside the
 > Nix build will fail at configure time. Build through `ws build` / `nix build`.
 
 ### Continuous Integration
@@ -460,7 +462,7 @@ for (int i = 0; i < 10; ++i) QCoreApplication::processEvents();
   strings (string results unquoted), and `formatEventJson` stringifies every data element
   with `.toString()` inside quotes — there is no real typing of returned values.
 - **Configures only inside Nix.** `AUTOMOC` is on and `src/CMakeLists.txt` hard-errors if
-  `LOGOS_PROTOCOL_ROOT` / `LOGOS_QT_SDK_ROOT` are not built packages, so it effectively only
+  `LOGOS_PROTOCOL_ROOT` / `LOGOS_QT_HOST_ROOT` are not built packages, so it effectively only
   configures within the Nix build.
 - **Tests need external mock headers.** `logos_mock.h` / `LogosMockSetup` come from
   `logos-protocol` / `logos-cpp-sdk` via the `*_ROOT` include dirs; they are not vendored.

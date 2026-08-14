@@ -10,15 +10,20 @@
       url = "github:logos-co/logos-protocol";
       inputs.logos-nix.follows = "logos-nix";
     };
-    logos-qt-sdk = {
-      url = "github:logos-co/logos-qt-sdk";
+    # The Qt HOST RUNTIME (LogosAPI / LogosAPIClient / LogosObject) this
+    # client layers on. It used to come from logos-qt-sdk; the runtime moved
+    # to logos-plugin-qt, published as `packages.<sys>.logos-qt-host` with the
+    # CMake target `logos-qt-host::logos_qt_host`. That is the only thing this
+    # repo ever took from logos-qt-sdk (no consumer emitter, no LpBridge
+    # headers), so the qt-sdk input is gone rather than kept alongside.
+    logos-plugin-qt = {
+      url = "github:logos-co/logos-plugin-qt";
       inputs.logos-nix.follows = "logos-nix";
       inputs.logos-protocol.follows = "logos-protocol";
-      inputs.logos-cpp-sdk.follows = "logos-cpp-sdk";
     };
   };
 
-  outputs = { self, nixpkgs, logos-nix, logos-cpp-sdk, logos-protocol, logos-qt-sdk }:
+  outputs = { self, nixpkgs, logos-nix, logos-cpp-sdk, logos-protocol, logos-plugin-qt }:
     let
       systems = [ "aarch64-darwin" "x86_64-darwin" "aarch64-linux" "x86_64-linux" ];
       forAllSystems = f: nixpkgs.lib.genAttrs systems (system: f {
@@ -26,13 +31,13 @@
         pkgs = import nixpkgs { inherit system; };
         logosSdk = logos-cpp-sdk.packages.${system}.default;
         logosProtocolPkg = logos-protocol.packages.${system}.default;
-        logosQtSdk = logos-qt-sdk.packages.${system}.default;
+        logosQtHost = logos-plugin-qt.packages.${system}.logos-qt-host;
       });
     in
     {
-      packages = forAllSystems ({ pkgs, system, logosSdk, logosProtocolPkg, logosQtSdk }:
+      packages = forAllSystems ({ pkgs, system, logosSdk, logosProtocolPkg, logosQtHost }:
         let
-          common = import ./nix/default.nix { inherit pkgs logosSdk logosProtocolPkg logosQtSdk; };
+          common = import ./nix/default.nix { inherit pkgs logosSdk logosProtocolPkg logosQtHost; };
           src = ./.;
 
           build = import ./nix/build.nix { inherit pkgs common src; };
