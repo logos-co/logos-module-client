@@ -6,8 +6,15 @@
     nixpkgs.follows = "logos-nix/nixpkgs";
     logos-cpp-sdk.url = "github:logos-co/logos-cpp-sdk";
     logos-cpp-sdk.inputs.logos-protocol.follows = "logos-protocol";
+    # Rev-pinned, not master-tracking: logos-qt-host (below) calls
+    # TokenManager::forIdentity / isolateIdentity, which live on
+    # logos-protocol's feat/per-client-token-store branch and are NOT on its
+    # master. Both logos-plugin-qt and logos-cpp-sdk `follow` THIS input, so a
+    # master-tracking pin here would build the Qt host runtime against a
+    # protocol that lacks those symbols. c8bab12 is a fast-forward from master,
+    # so nothing on master is given up. Drop the rev once it merges.
     logos-protocol = {
-      url = "github:logos-co/logos-protocol";
+      url = "github:logos-co/logos-protocol/c8bab12834dbf92155b483546875e6078d17c74e";
       inputs.logos-nix.follows = "logos-nix";
     };
     # The Qt HOST RUNTIME (LogosAPI / LogosAPIClient / LogosObject) this
@@ -16,8 +23,18 @@
     # CMake target `logos-qt-host::logos_qt_host`. That is the only thing this
     # repo ever took from logos-qt-sdk (no consumer emitter, no LpBridge
     # headers), so the qt-sdk input is gone rather than kept alongside.
+    #
+    # Rev-pinned for the same reason logos-protocol is: `logos-qt-host` does
+    # not exist on logos-plugin-qt's master (8846fc5) — a master-tracking url
+    # fails to evaluate with "attribute 'logos-qt-host' missing". cc24fa1 is
+    # the tip of that repo's feat/b4-qt-host-windows-target, already rebased
+    # onto its master. It is the SUPERSET of the two branches carrying this
+    # work; the sibling feat/b4-qt-host-windows-target-8ccb1fc (989f6ae) omits
+    # commits that logos-module-builder pins, so pinning the superset here is
+    # what keeps one logos-qt-host in the downstream closure instead of two.
+    # Drop the rev once it merges.
     logos-plugin-qt = {
-      url = "github:logos-co/logos-plugin-qt";
+      url = "github:logos-co/logos-plugin-qt/cc24fa1c0c43b2d96c1dc165ee545a0321318b59";
       inputs.logos-nix.follows = "logos-nix";
       inputs.logos-protocol.follows = "logos-protocol";
     };
